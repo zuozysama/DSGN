@@ -1,0 +1,180 @@
+# This configuration file is for training the IQN algorithm in a pursuit-evasion task.
+# Some parameters are for recording purposes only and will not be used during training.
+
+# Set random seed to ensure experiment reproducibility
+seed: 9
+
+# Total number of training timesteps
+total_timesteps: 7000000
+
+# Frequency of evaluation during training
+save_freq: 200000
+
+# Training schedule parameters
+training_schedule:
+  # Timesteps at which changes occur
+  time_steps: [ 0, 2000000, 4000000, 5000000, 6000000 ]
+  # Number of pursuers at each stage
+  num_pursuers: [ 3, 4, 7, 11, 15 ]
+  # Number of evaders at each stage
+  num_evaders: [ 1, 2, 2, 3, 4 ]
+  # Number of ocean current fields used at each stage
+  num_cores: [ 0, 0, 0, 0, 0 ]
+  # Number of obstacles in the environment at each stage
+  num_obstacles: [ 0, 1, 2, 4, 6 ]
+  # Minimum initial distance between pursuers and evaders
+  min_pursuer_evader_init_dis: [ 10.0, 13.0, 15.0, 20.0, 20.0 ]
+  # 关键：控制 Evader 的最大速度系数
+  # 0.0: 纯巡逻阶段(无视)
+  # 0.2: 乌龟速度 (学习包围站位)
+  # 0.6: 慢速 (学习动态追击)
+  # 1.0: 全速 (最终测试)
+  evader_speed_ratios: [ 0.0, 0.2, 0.6, 0.8, 1.0 ]
+
+# Evaluation schedule parameters
+eval_schedule:
+  # Number of episodes per evaluation configuration
+  # Increase the number of episodes for more stable evaluation results
+  num_episodes: [ 20, 20, 20, 20, 20 ]
+
+  # Number of pursuers per evaluation step
+  # Covers key stages from training: initial (3), mid-stage (7,11), late-stage (15,18)
+  num_pursuers: [ 3, 7, 11, 15, 18 ]
+
+  # Number of evaders per evaluation step
+  # Corresponding to different stages in training
+  num_evaders: [ 1, 2, 3, 4, 5 ]
+
+  # Number of processing units used per evaluation step
+  # Adapt processing units based on task complexity
+  num_cores: [ 0, 0, 0, 0, 0 ]
+
+  # Number of obstacles in the environment per evaluation step
+  # Gradually increasing complexity
+  num_obstacles: [ 0, 2, 4, 6, 8 ]
+
+  # Minimum initial distance between pursuers and evaders during evaluation
+  # Use larger distances from the final stage of training to test stability
+  min_pursuer_evader_init_dis: [ 20.0, 20.0, 20.0, 20.0, 20.0 ]
+
+exp_schedule:
+  # 20 episodes per evaluation configuration to ensure result stability
+  num_episodes: [ 20, 20, 20, 20, 20 ]
+
+  # Number of pursuers set to 3, 7, 11, 15, 18
+  # Represents a progressive increase, making stage differences more noticeable
+  num_pursuers: [ 3, 7, 11, 15, 18 ]
+
+  # Number of evaders increasing from 1 to 5
+  # Maintains a reasonable ratio to pursuers (~1:3)
+  num_evaders: [ 1, 2, 3, 4, 5 ]
+
+  num_cores: [ 4, 6, 8, 8, 8 ]
+
+  # Number of obstacles gradually increasing to reflect increasing environmental complexity
+  num_obstacles: [ 0, 2, 4, 6, 8 ]
+
+  # Initial minimum distance uniformly set to 20.0
+  # Uses larger distances to test algorithm stability
+  min_pursuer_evader_init_dis: [ 10.0, 13.0, 15.0, 20.0, 20.0 ]
+
+# Whether to use Implicit Quantile Network (IQN) in training
+use_iqn: true
+
+# Training parameters
+training:
+  # Maximum timesteps per episode during training
+  episode_max_length: 3000
+  update_every: 4
+  learning_rate: 1e-4
+  gating_reg_coeff: 0.005
+
+# Environment parameters
+env:
+  # Width of the environment
+  width: 112.0
+  # Height of the environment
+  height: 112.0
+  # Radius around the pursuer that must be free of objects
+  clear_r: 15.0
+  # Range of obstacle radius
+  obs_r_range: [ 1.0, 1.1 ]
+
+  # ==========================================
+  # ⚠️ Patrol Specific Rewards (New Added)
+  # ==========================================
+  # 1. Arrival Reward Scaling Factor (Alpha)
+  # Reward = scale * normalized_idleness
+  # Set to 20.0 to ensure Reward > Travel Cost (~15.0)
+  patrol_arrival_scale: 20.0
+
+  # 2. Shaping Reward Scaling Factor (Beta)
+  # Reward = scale * (dist_prev - dist_curr)
+  # Set to 1.5. Max speed 3.0 -> Max reward 4.5 per step.
+  # Net gain = 4.5 - 1.0(timestep) = +3.5. Strong guidance.
+  patrol_shaping_scale: 2.5
+
+  # 3. Full Coverage Success Reward
+  # Equivalent to capturing an evader. Highly encourages finishing the loop.
+  patrol_full_coverage_reward: 100.0
+
+  # 4. Normalization Factor for Idleness
+  # Should match the expected steps to traverse the map (~200-250)
+  patrol_normalization_factor: 250.0
+
+  # ==========================================
+  # Existing Rewards (Compatible)
+  # ==========================================
+
+  # Sparse reward (Won't trigger in pure patrol, but keep for future)
+  goal_reward: 100.0
+
+  # Dense rewards
+  distance_reward: 2.0          # Reward for getting closer to the target
+  timestep_penalty: -1.0        # Penalty per step to encourage faster task completion
+  decay_factor: -0.05           # Reward decay factor
+
+  # Penalties (High enough to prevent reckless patrol)
+  emergency_penalty: -12.0
+  collision_penalty: -80.0      # Must be >> patrol_arrival_scale (20.0)
+  boundary_penalty: -10.0
+
+  # Global cooperation reward (For Pursuit)
+  evenly_distributed_reward: 5.0
+  unevenly_distributed_reward: -10.0
+
+  # Distance thresholds
+  capture_distance: 8.0         # Capture distance
+  related_distance: 18.0        # Related distance (threshold for determining pursuer-evader interaction)
+
+# Pursuer agent parameters
+pursuer:
+  # Maximum speed of the pursuer
+  max_speed: 3.0
+  # Distance within which the pursuer can capture an evader
+  distance_capture: env.capture_distance
+  # Available acceleration values for the pursuer
+  a: [ -0.4, 0.0, 0.4 ]
+  # Available angular velocity (turning speed) values for the pursuer
+  w: [ -0.5235987755982988, 0.0, 0.5235987755982988 ]
+  # Perception range of the pursuer
+  perception_range: 20.0
+
+# Evader agent parameters
+evader:
+  # Maximum speed of the evader
+  max_speed: 3.5
+  # Available acceleration values for the evader
+  a: [ -0.4, 0.0, 0.4 ]
+  # Available angular velocity (turning speed) values for the evader
+  w: [ -0.5235987755982988, -0.2617993877991494, 0.0, 0.2617993877991494, 0.5235987755982988 ]
+  # Perception range of the evader
+  perception_range: 20.0
+
+# APF strategy parameters
+apf:
+  force_range: 16.0
+
+perception:
+  # Maximum number of observable evaders
+  max_evader_num: 8

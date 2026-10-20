@@ -1,0 +1,246 @@
+# ==============================================================================
+# Experiment Configuration for TERL (Transformer-Enhanced RL)
+# Context: Marine Multi-Robot Pursuit-Evasion & Patrol
+# ==============================================================================
+
+# Global Seed for reproducibility
+seeds: 6
+
+# ==============================================================================
+# ⚠️ Experiment Schedule (Core Changes)
+# This list drives the 'run_experiment' loop.
+# Each item is a self-contained scenario config passed to ScenarioLoader.
+# ==============================================================================
+exp_schedule:
+  test_cases:
+    # # ------------------------------------------------------------------------
+    # # Group A: Random Benchmarks (Tier 1 - General Performance)
+    # # ------------------------------------------------------------------------
+    # - name: "Benchmark_Small"
+    #   mode: "random"
+    #   num_episodes: 20
+    #   num_pursuers: 3
+    #   num_evaders: 1
+    #   num_obs: 8
+    #   # Initial distance constraint for random generation
+    #   min_pursuer_evader_init_dis: 20.0
+
+    # - name: "Benchmark_Medium"
+    #   mode: "random"
+    #   num_episodes: 20
+    #   num_pursuers: 6
+    #   num_evaders: 2
+    #   num_obs: 8
+    #   min_pursuer_evader_init_dis: 20.0
+
+    # # ------------------------------------------------------------------------
+    # # Group B: Corner Cases (Tier 2 - Intelligence Tests)
+    # # ------------------------------------------------------------------------
+
+    # # [Case 1] The Wall Trap (隔墙有眼)
+    # # Tests if the agent can navigate around a long wall instead of getting stuck.
+    # - name: "Corner_Wall_Trap"
+    #   mode: "custom"
+    #   num_episodes: 5
+    #   num_pursuers: 3
+    #   initial_evaders: 1
+    #   # Pursuers on the left, Evader on the right, blocked by a vertical wall
+    #   pursuer_pos: [[30.0, 56.0], [25.0, 50.0], [25.0, 62.0]]
+    #   evader_pos: [[80.0, 56.0]]
+    #   obstacles:
+    #     # A vertical wall in the middle (x=56, y=20 to 92)
+    #     # Using dense overlapping circles to simulate a wall
+    #     - {
+    #         type: "wall",
+    #         start: [56.0, 20.0],
+    #         end: [56.0, 92.0],
+    #         r: 1.5,
+    #         gap: 1.0,
+    #       }
+
+    # # [Case 2] Narrow Passage (独木桥)
+    # # Tests formation control and congestion avoidance.
+    # - name: "Corner_Narrow_Passage"
+    #   mode: "custom"
+    #   num_episodes: 5
+    #   num_pursuers: 4
+    #   initial_evaders: 1
+    #   # Two long horizontal walls forming a tunnel in the center
+    #   pursuer_pos: [[10.0, 50.0], [10.0, 54.0], [10.0, 58.0], [10.0, 62.0]]
+    #   evader_pos: [[100.0, 56.0]]
+    #   obstacles:
+    #     # Upper Wall
+    #     - { type: "wall", start: [30.0, 70.0], end: [80.0, 70.0], r: 2.0 }
+    #     # Lower Wall
+    #     - { type: "wall", start: [30.0, 42.0], end: [80.0, 42.0], r: 2.0 }
+
+    # ------------------------------------------------------------------------
+    # Group C: Dynamic Task Switching (Tier 3 - Temporal Analysis)
+    # ------------------------------------------------------------------------
+    # [Case 3] Pure Patrol (纯巡逻)
+    # Tests coverage efficiency without enemies.
+    Pure_Patrol:
+      - name: "Task_Pure_Patrol_Pursuer3"
+        mode: "random"
+        # difficulty: "medium"
+        num_obs: 8
+        num_episodes: 40
+        num_pursuers: 3
+        initial_evaders: 0 # No enemies at start
+        min_pursuer_evader_init_dis: 20.0
+        # No delayed events -> Pure Patrol Mode
+
+      - name: "Task_Pure_Patrol_Pursuer4"
+        mode: "random"
+        # difficulty: "medium"
+        num_obs: 8
+        num_episodes: 40
+        num_pursuers: 4
+        initial_evaders: 0 # No enemies at start
+        min_pursuer_evader_init_dis: 20.0
+        # No delayed events -> Pure Patrol Mode
+
+      - name: "Task_Pure_Patrol_Pursuer5"
+        mode: "random"
+        # difficulty: "medium"
+        num_obs: 8
+        num_episodes: 40
+        num_pursuers: 5
+        initial_evaders: 0 # No enemies at start
+        min_pursuer_evader_init_dis: 20.0
+        # No delayed events -> Pure Patrol Mode
+
+# ========================================================================
+    # Series: Task Switch Dynamics (The "Heartbeat" Test)
+    # Core Objective: Validate the speed, synchronicity, and stability of
+    #                 switching between High-Entropy (Patrol) and Low-Entropy (Pursuit).
+    # Ratio: Strictly 3:1 (Pursuers : Evaders) to ensure valid encirclement physics.
+    # ========================================================================
+
+    # [Case 4-A] Switching Agility (3v1)
+    # Hypothesis: TERL shows near-zero latency in task transition compared to baselines.
+    Task_Switching:
+      - name: "Switch_Agility_3v1"
+        mode: "random"
+        num_episodes: 40
+        num_pursuers: 3
+        initial_evaders: 0
+        num_obs: 6
+        min_pursuer_evader_init_dis: 20.0
+
+        delayed_events:
+          # Single pulse shock
+          - { step: 50, type: "spawn_evader", pos: "ambush_in_sight" }
+
+
+      # [Case 4-B] Switching Synchronicity (6v2)
+      # Hypothesis: TERL prevents "Mode Confusion" where some agents patrol while others pursue.
+      - name: "Switch_Synchronicity_6v2"
+        mode: "random"
+        num_episodes: 40
+        num_pursuers: 6
+        initial_evaders: 0
+        num_obs: 8  # Moderate obstacles
+        min_pursuer_evader_init_dis: 20.0
+
+        delayed_events:
+          # Dual pulse shock.
+          # Crucial: Simultaneous spawn tests if the *entire* system can freeze expansion instantly.
+          - { step: 50, type: "spawn_evader", pos: "ambush_in_sight" }
+          - { step: 50, type: "spawn_evader", pos: "ambush_in_sight" }
+
+
+      # [Case 4-C] Switching Stability (9v3)
+      # Hypothesis: TERL handles the massive "Momentum Shift" (Expansion -> Contraction)
+      #             without oscillating or breaking formation.
+      - name: "Switch_Stability_9v3"
+        mode: "random"
+        num_episodes: 40
+        num_pursuers: 9
+        initial_evaders: 0
+        num_obs: 12 # Dense obstacles make the "Retreat" harder during switch
+        min_pursuer_evader_init_dis: 20.0
+
+        delayed_events:
+          # Massive system shock.
+          # Observation Focus: Does the coverage curve flatten perfectly, or does it jitter?
+          - { step: 50, type: "spawn_evader", pos: "ambush_in_sight" }
+          - { step: 50, type: "spawn_evader", pos: "ambush_in_sight" }
+          - { step: 50, type: "spawn_evader", pos: "ambush_in_sight" }
+
+# ==============================================================================
+# Environment Parameters (Matches Training Config)
+# ==============================================================================
+env:
+  width: 112.0
+  height: 112.0
+  clear_r: 15.0
+  # For random generation mode
+  obs_r_range: [1.0, 1.1]
+
+  # --- Rewards (Crucial for Patrol Logic) ---
+  # These ensure the agent knows *how* to patrol when no evaders are present.
+  patrol_arrival_scale: 20.0 # Reward for visiting a high-idleness point
+  patrol_shaping_scale: 2.5 # Guidance potential to the red-est point
+  patrol_full_coverage_reward: 100.0 # Bonus for clearing the whole map
+  patrol_normalization_factor: 250.0 # Approx steps to cross map
+
+  # --- Rewards (Pursuit) ---
+  goal_reward: 100.0 # Capture reward
+  distance_reward: 2.0 # Shaping reward for approaching target
+
+  # --- Penalties ---
+  timestep_penalty: -1.0
+  decay_factor: -0.05
+  emergency_penalty: -12.0 # Too close to obstacle/teammate
+  collision_penalty: -80.0 # Crash
+  boundary_penalty: -10.0
+
+  # Global cooperation reward (For Pursuit)
+  evenly_distributed_reward: 5.0
+  unevenly_distributed_reward: -10.0
+
+  # Distance definitions
+  capture_distance: 8.0
+  related_distance: 18.0 # FOV / Interaction range
+
+# ==============================================================================
+# Agent Parameters
+# ==============================================================================
+pursuer:
+  max_speed: 3.0
+  distance_capture: env.capture_distance # Should match env.capture_distance
+  # Kinematics
+  # Available acceleration values for the pursuer
+  a: [-0.4, 0.0, 0.4]
+  # Available angular velocity (turning speed) values for the pursuer
+  w: [-0.5235987755982988, 0.0, 0.5235987755982988]
+  perception_range: 20.0
+
+evader:
+  max_speed: 3.5 # Faster than pursuer (requires encirclement)
+  # Available acceleration values for the evader
+  a: [-0.4, 0.0, 0.4]
+  # Available angular velocity (turning speed) values for the evader
+  w:
+    [
+      -0.5235987755982988,
+      -0.2617993877991494,
+      0.0,
+      0.2617993877991494,
+      0.5235987755982988,
+    ]
+  # Perception range of the evader
+  perception_range: 20.0
+
+# APF Strategy (Template for Evaders)
+apf:
+  force_range: 16.0
+
+perception:
+  max_evader_num: 8
+
+# Training placeholders (Not used in Eval, but kept for parser compatibility)
+training:
+  episode_max_length: 3000
+  update_every: 4

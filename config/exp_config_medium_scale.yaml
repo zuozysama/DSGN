@@ -1,0 +1,124 @@
+# This configuration file is for experimental use only. Do not use this configuration for training.
+
+# Set random seed to ensure experiment reproducibility
+seed: 6
+
+exp_schedule:
+  # Number of episodes per experiment configuration
+  num_episodes: [20, 20, 20]
+  # Number of pursuers per experiment stage
+  # Density-matched: Low (1.200e-3), Medium (1.600e-3), High (2.000e-3)
+  num_pursuers: [38, 51, 64]
+  # Number of evaders per experiment stage
+  num_evaders: [10, 13, 16]
+  # Number of ocean current fields used per experiment stage
+  num_cores: [0, 0, 0]
+  # Number of obstacles in the environment per experiment stage
+  num_obstacles: [10, 10, 10]
+  # Minimum initial distance between pursuers and evaders during experiment
+  min_pursuer_evader_init_dis: [20.0, 20.0, 20.0]
+
+# Training parameters
+training:
+  # Maximum timesteps per episode during training
+  episode_max_length: 3000
+  update_every: 4
+  learning_rate: 1e-4
+  gating_reg_coeff: 0.01
+
+# Environment parameters
+env:
+  # Width of the environment
+  width: 200.0
+  # Height of the environment
+  height: 200.0
+  # Radius around the pursuer that must be free of objects
+  clear_r: 15.0
+  # Range of obstacle radius
+  obs_r_range: [ 1.0, 1.1 ]
+
+  # ==========================================
+  # ⚠️ Patrol Specific Rewards (New Added)
+  # ==========================================
+  # 1. Arrival Reward Scaling Factor (Alpha)
+  # Reward = scale * normalized_idleness
+  # Set to 20.0 to ensure Reward > Travel Cost (~15.0)
+  patrol_arrival_scale: 20.0
+
+  # 2. Shaping Reward Scaling Factor (Beta)
+  # Reward = scale * (dist_prev - dist_curr)
+  # Set to 1.5. Max speed 3.0 -> Max reward 4.5 per step.
+  # Net gain = 4.5 - 1.0(timestep) = +3.5. Strong guidance.
+  patrol_shaping_scale: 2.5
+
+  # 3. Full Coverage Success Reward
+  # Equivalent to capturing an evader. Highly encourages finishing the loop.
+  patrol_full_coverage_reward: 100.0
+
+  # 4. Normalization Factor for Idleness
+  # Should match the expected steps to traverse the map (~200-250)
+  patrol_normalization_factor: 250.0
+
+  # ==========================================
+  # Existing Rewards (Compatible)
+  # ==========================================
+
+  # Sparse reward (Won't trigger in pure patrol, but keep for future)
+  goal_reward: 100.0
+
+  # Dense rewards
+  distance_reward: 2.0          # Reward for getting closer to the target
+  timestep_penalty: -1.0        # Penalty per step to encourage faster task completion
+  decay_factor: -0.05           # Reward decay factor
+
+  # Penalties (High enough to prevent reckless patrol)
+  emergency_penalty: -12.0
+  collision_penalty: -80.0      # Must be >> patrol_arrival_scale (20.0)
+  boundary_penalty: -10.0
+
+  # Global cooperation reward (For Pursuit)
+  evenly_distributed_reward: 5.0
+  unevenly_distributed_reward: -10.0
+
+  # Distance thresholds
+  capture_distance: 8.0         # Capture distance
+  related_distance: 18.0        # Related distance (threshold for determining pursuer-evader interaction)
+
+# Pursuer agent parameters
+pursuer:
+  # Maximum speed of the pursuer
+  max_speed: 3.0
+  # Distance within which the pursuer can capture an evader
+  distance_capture: env.capture_distance
+  # Available acceleration values for the pursuer
+  a: [ -0.4, 0.0, 0.4 ]
+  # Available angular velocity (turning speed) values for the pursuer
+  w: [ -0.5235987755982988, 0.0, 0.5235987755982988 ]
+  # Perception range of the pursuer
+  perception_range: 20.0
+
+# Evader agent parameters
+evader:
+  # Maximum speed of the evader
+  max_speed: 3.5
+  # Available acceleration values for the evader
+  a: [-0.4, 0.0, 0.4]
+  # Available angular velocity (turning speed) values for the evader
+  w:
+    [
+      -0.5235987755982988,
+      -0.2617993877991494,
+      0.0,
+      0.2617993877991494,
+      0.5235987755982988,
+    ]
+  # Perception range of the evader
+  perception_range: 20.0
+
+# APF strategy parameters
+apf:
+  force_range: 16.0
+
+perception:
+  # Maximum number of observable evaders
+  max_evader_num: 8
